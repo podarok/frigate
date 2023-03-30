@@ -1,22 +1,20 @@
 # syntax=docker/dockerfile:1.2
 
-# https://askubuntu.com/questions/972516/debian-frontend-environment-variable
 ARG DEBIAN_FRONTEND=noninteractive
 
-FROM debian:11 AS base
+FROM debian:11-slim AS base
 
-FROM --platform=linux/amd64 debian:11 AS base_amd64
-
-FROM debian:11-slim AS slim-base
-
-FROM slim-base AS wget
+FROM base AS build_deps
 ARG DEBIAN_FRONTEND
-RUN apt-get update \
-    && apt-get install -y wget xz-utils \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+FROM build_deps AS wget
 WORKDIR /rootfs
 
-FROM base AS nginx
+FROM build_deps AS nginx
 ARG DEBIAN_FRONTEND
 
 # bind /var/cache/apt to tmpfs to speed up nginx build
@@ -24,12 +22,11 @@ RUN --mount=type=tmpfs,target=/tmp --mount=type=tmpfs,target=/var/cache/apt \
     --mount=type=bind,source=docker/build_nginx.sh,target=/deps/build_nginx.sh \
     /deps/build_nginx.sh
 
-FROM wget AS go2rtc
+FROM build_deps AS go2rtc
 ARG TARGETARCH
 WORKDIR /rootfs/usr/local/go2rtc/bin
 RUN wget -qO go2rtc "https://github.com/AlexxIT/go2rtc/releases/download/v1.2.0/go2rtc_linux_${TARGETARCH}" \
     && chmod +x go2rtc
-
 
 ####
 #
